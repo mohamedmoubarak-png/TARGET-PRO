@@ -1,0 +1,50 @@
+:root {
+  /* Backgrounds — 3 elevation levels */
+  --bg-base:      #060d1a;
+  --bg-surface:   rgba(255,255,255,0.04);
+  --bg-elevated:  rgba(255,255,255,0.07);
+  --bg-hover:     rgba(255,255,255,0.09);
+
+  /* Accent */
+  --gold:         #D4A843;
+  --gold-light:   #f0c857;
+  --gold-glow:    rgba(212,168,67,0.15);
+  --gold-border:  rgba(212,168,67,0.22);
+
+  /* Semantic */
+  --success:      #34D399;
+  --success-bg:   rgba(52,211,153,0.09);
+  --success-bd:   rgba(52,211,153,0.25);
+
+  --warning:      #D4A843;
+  --warning-bg:   rgba(212,168,67,0.09);
+  --warning-bd:   rgba(212,168,67,0.25);
+
+  --danger:       #F87171;
+  --danger-bg:    rgba(248,113,113,0.09);
+  --danger-bd:    rgba(248,113,113,0.25);
+
+  --info:         #4F9CF9;
+  --info-bg:      rgba(79,156,249,0.09);
+  --info-bd:      rgba(79,156,249,0.25);
+
+  /* Typography */
+  --text-primary:   #e8edf8;
+  --text-secondary: rgba(255,255,255,0.65);
+  --text-muted:     rgba(255,255,255,0.35);
+  --text-subtle:    rgba(255,255,255,0.18);
+
+  /* Borders */
+  --border-subtle: rgba(255,255,255,0.08);
+  --border-accent: rgba(212,168,67,0.22);
+
+  /* Shadows */
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.35);
+  --shadow-glow: 0 0 24px var(--gold-glow);
+
+  /* Radii */
+  --r-sm:  8px;
+  --r-md:  12px;
+  --r-lg:  18px;
+  --r-xl:  24px;
+}
