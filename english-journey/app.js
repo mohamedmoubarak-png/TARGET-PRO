@@ -3,6 +3,8 @@
 const KEY='ej_state_v1';
 const LV_BANDS=[[0,30,'A1'],[31,40,'A2'],[41,50,'B1'],[51,60,'B2'],[61,70,'C1'],[71,100,'C2']];
 const NEW_PER_DAY=15;
+const APP_VERSION='2.0';
+const DEV_NAME='Mohamed Sayed';
 
 // ---------- التخزين ----------
 function defState(){return{start:'',theme:'auto',level:'A2',days:{},mins:{},plan:{},cards:{},custom:[],newSeen:{},journal:{},scores:[],open:{},texts:{},drafts:{}}}
@@ -96,7 +98,7 @@ window.addEventListener('hashchange',route);
 function vToday(){const t=today(),w=curWeek(),Wk=W[w],d=S.days[t]||{},L=weekLinks(w),q=queue().length;
  const done=dayDone(t),mins=ROUTINE.filter(r=>d[r.k]).reduce((a,r)=>a+r.m,0);
  const n=dayInPlan();
- const body=`
+ const body=`${installCard()}
  <div class="hero"><small>${phaseLabel()} · الأسبوع ${w} من 12 · اليوم ${Math.max(1,n)}</small>
   <h2>${tx(Wk.t)}</h2>
   <div class="ln">📘 القواعد: ${L.g}<br>🔊 النطق: ${L.p}<br>🗂 الكلمات: ${tx(Wk.v)}<br>📄 نص الأسبوع: <a href="#text-${w}" class="en">${esc(TEXTS[w].t)}</a><br>🎭 حوار الأسبوع: <a href="#dlg-${w}" class="en">${esc(DIALOGS[w].t)}</a><br>🎧 كمان: ${tx(Wk.l)}</div></div>
@@ -115,7 +117,8 @@ function vToday(){const t=today(),w=curWeek(),Wk=W[w],d=S.days[t]||{},L=weekLink
   ${Wk.task.map((x,i)=>`<div class="wl"><span>${tx(x)}</span><button class="chk" style="width:24px;height:24px" onclick="ptick(${w},${i})" aria-label="تمت المهمة">${S.plan['w'+w+'t'+i]?'✓':''}</button></div>`).join('')}
   <div class="small muted" style="margin-top:6px">✅ علامة النجاح: ${tx(Wk.ck)}</div></div>
  ${needBackup()?`<div class="card" style="border-color:var(--gold)"><span class="lbl">💾 خد نسخة احتياطية</span><p class="small muted" style="margin:0 0 8px">${S.lastBackup?'آخر نسخة من '+diffDays(S.lastBackup,t)+' يوم':'لسه ما خدتش أي نسخة'}. كل تقدمك محفوظ على الموبايل ده بس.</p><button class="btn sm gold" onclick="exportData()">⬇ تصدير دلوقتي</button></div>`:''}
- <div class="small muted" style="text-align:center">يوم بيتحسب في السلسلة لو خلصت 3 حاجات على الأقل</div>`;
+ <div class="small muted" style="text-align:center">يوم بيتحسب في السلسلة لو خلصت 3 حاجات على الأقل</div>
+ <div class="dev">تطوير <span class="en">${DEV_NAME}</span></div>`;
  shell('النهارده',body,'today');
  document.querySelectorAll('.task.done .chk').forEach(b=>b.style.color='#fff');
  document.querySelectorAll('.wl .chk').forEach(b=>{if(b.textContent){b.style.background='var(--ok)';b.style.borderColor='var(--ok)'}})}
@@ -263,6 +266,8 @@ function vSettings(){shell('الإعدادات',`<div class="card"><label class=
  <div class="card"><span class="lbl">نسخة احتياطية</span><p class="small muted" style="margin-top:0">كل حاجة محفوظة على الجهاز ده بس. خد نسخة كل أسبوع.</p>
  <div class="row"><button class="btn gold" onclick="exportData()">⬇ تصدير</button><button class="btn ghost" onclick="copy(JSON.stringify(S))">نسخ</button><label class="btn ghost">⬆ استيراد<input type="file" accept="application/json" hidden onchange="importData(this)"></label></div></div>
  <div class="card"><span class="lbl">أدوات مفيدة</span>${RES.tools.map(resRow).join('')}</div>
+ ${installCard(true)}
+ <div class="card"><span class="lbl">عن التطبيق</span><p style="margin:0">رحلة الإنجليزي <span class="en">A2 → B1</span> · الإصدار <span class="en">${APP_VERSION}</span></p><p class="small" style="margin:4px 0 0">تطوير: <b class="en">${DEV_NAME}</b></p><p class="small muted" style="margin:4px 0 0">كل بياناتك محفوظة على الموبايل ده بس، ومش بتتبعت لأي سيرفر.</p></div>
  <button class="btn ghost full" style="color:var(--bad)" onclick="resetAll(this)">مسح كل البيانات</button>`,'');
  $('#th').value=S.theme}
 function saveSet(){S.start=$('#st').value||today();S.level=$('#lv').value;S.theme=$('#th').value;try{localStorage.removeItem('eng-theme');localStorage.removeItem('pron-theme')}catch(e){}applyTheme();save();toast('اتحفظ ✓')}
@@ -341,5 +346,20 @@ function copyModelFix(i){const M=MODELS[i],v=($('#dr')||{}).value||'';if(!v.trim
  copy(`My level is ${S.level}. I wrote this for the task "${M.t}" (${M.k}).\nCorrect my English. Show each mistake, the correct version, and a short reason in Egyptian Arabic. Then check it against this checklist and give me a better version:\n- ${M.ck.join('\n- ')}\n\n${v}`)}
 
 // ---------- تشغيل ----------
+// ---------- التثبيت على الموبايل ----------
+let installEvt=null;
+function isStandalone(){try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}}
+function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}
+// force: في الإعدادات بيظهر دايمًا (لو التطبيق مش متثبت)، وفي "النهارده" بيظهر لحد ما تقول "بعدين"
+function installCard(force){if(isStandalone()||(!force&&S.hideInstall))return '';
+ const later=force?'':`<button class="btn ghost sm" onclick="hideInstall()">بعدين</button>`;
+ if(installEvt)return `<div class="card inst"><span class="lbl">📲 ثبّت التطبيق على موبايلك</span><p class="small" style="margin:0 0 8px">يفتح من الشاشة الرئيسية زي أي تطبيق، ويشتغل من غير نت.</p><div class="row"><button class="btn" onclick="doInstall()">ثبّت دلوقتي</button>${later}</div></div>`;
+ if(isIOS())return `<div class="card inst"><span class="lbl">📲 ثبّت التطبيق على الآيفون</span><p class="small" style="margin:0 0 8px">افتح الرابط من <b>Safari</b> ← دوس زرار المشاركة <b>⬆︎</b> ← اختار <b>إضافة إلى الشاشة الرئيسية</b> ← <b>إضافة</b>.</p>${later}</div>`;
+ return force?`<div class="card inst"><span class="lbl">📲 تثبيت التطبيق</span><p class="small" style="margin:0">افتح الرابط من <b>Chrome</b> ← القايمة <b>⋮</b> ← <b>تثبيت التطبيق</b> أو <b>إضافة إلى الشاشة الرئيسية</b>.</p></div>`:''}
+async function doInstall(){const e=installEvt;if(!e)return;installEvt=null;try{e.prompt();const r=await e.userChoice;if(r&&r.outcome==='accepted')toast('بيتثبت... هتلاقيه على الشاشة الرئيسية')}catch(x){}route()}
+function hideInstall(){S.hideInstall=true;save();route()}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;const h=location.hash||'#today';if(h==='#today'||h==='#prefs')route()});
+window.addEventListener('appinstalled',()=>{installEvt=null;toast('التطبيق اتثبت ✓')});
+
 applyTheme();route();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}})}
