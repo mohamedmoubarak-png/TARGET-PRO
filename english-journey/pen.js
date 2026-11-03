@@ -7,7 +7,8 @@
 // الملف ده لازم يتحمّل قبل app.js، وكل اللي فيه دوال بتشتغل وقت الاستخدام.
 const HW_FONT='"Andika","Segoe UI",Arial,sans-serif';
 let PS=null; // جلسة التمرين الحالية
-const PEN={st:[],cur:null,er:false,penSeen:false,dpr:1,w:0,h:0,rows:1,ink:'#2C2C2C'};
+const PEN={st:[],cur:null,er:false,penSeen:false,dpr:1,w:0,h:0,rows:1,ink:'#2C2C2C',ext:null};
+// ext: لما الورقة بتتستخدم برّه تمرين القلم (زي البطاقات): {t: الإجابة, show: ترسمها ولا لأ}
 
 function hwState(){if(!S.hw)S.hw={miss:{},n:0,ok:0};return S.hw}
 function hwKey(t){return String(t).trim().toLowerCase()}
@@ -53,7 +54,7 @@ function penStart(mode){const words=mode==='w'||mode==='miss';
 function penQuit(){PS=null;go('pen')}
 
 // ---------- شاشة التمرين ----------
-function vPenRun(){if(!PS)return vPen();actStart('write');if(PS.i>=PS.items.length)return penSummary();
+function vPenRun(){if(!PS)return vPen();actStart('write');PEN.ext=null;if(PS.i>=PS.items.length)return penSummary();
  const it=PS.items[PS.i],n=PS.items.length,three=/–/.test(it.t);
  shell('الكتابة بالقلم',`<div class="row small muted" style="margin-bottom:8px"><span style="flex:1">${PS.trace?'تحسين الخط':PS.words?'إملاء كلمات':'إملاء جمل'} · ${PS.i+1} من ${n}</span><button class="btn sm ghost" onclick="penQuit()">خروج</button></div>
  <div class="bar" style="margin-bottom:10px"><i style="width:${PS.i/n*100}%"></i></div>
@@ -88,7 +89,7 @@ function penSummary(){const n=PS.res.length,ok=PS.res.filter(r=>r.ok).length,bad
  <div class="row" style="justify-content:center;margin-top:12px"><button class="btn" onclick="penStart('${bad.length&&!PS.trace?'miss':PS.mode}')">${bad.length&&!PS.trace?'اتمرن على أخطائك':'تمرين تاني'}</button><button class="btn ghost" onclick="penQuit()">رجوع</button></div></div>`,'axes')}
 
 // ---------- الورقة والقلم ----------
-function penLayout(){const pad=$('#pad');if(!pad)return;const g=$('#guide'),k=$('#ink'),dpr=window.devicePixelRatio||1,w=pad.clientWidth,R=PS&&!PS.words?92:108,h=R*PEN.rows;
+function penLayout(){const pad=$('#pad');if(!pad)return;const g=$('#guide'),k=$('#ink'),dpr=window.devicePixelRatio||1,w=pad.clientWidth,R=!PEN.ext&&PS&&!PS.words?92:108,h=R*PEN.rows;
  Object.assign(PEN,{dpr,w,h,ink:cssVar('--text')||'#2C2C2C'});pad.style.height=h+'px';
  [g,k].forEach(c=>{c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);c.style.width=w+'px';c.style.height=h+'px';c.getContext('2d').setTransform(dpr,0,0,dpr,0,0)});
  penGuides();penRedraw();penBind(k)}
@@ -96,7 +97,8 @@ function penLayout(){const pad=$('#pad');if(!pad)return;const g=$('#guide'),k=$(
 function penGuides(){const g=$('#guide');if(!g)return;const c=g.getContext('2d'),w=PEN.w,R=PEN.h/PEN.rows,L=cssVar('--line'),B=cssVar('--head');c.clearRect(0,0,w,PEN.h);
  const ln=(y,col,lw,dash)=>{c.beginPath();c.setLineDash(dash);c.strokeStyle=col;c.lineWidth=lw;c.moveTo(0,y);c.lineTo(w,y);c.stroke()};
  for(let i=0;i<PEN.rows;i++){const t=i*R;ln(t+R*.18,L,1,[]);ln(t+R*.42,L,1,[6,6]);ln(t+R*.66,B,1.4,[]);ln(t+R*.9,L,1,[2,5])}
- c.setLineDash([]);const it=PS&&PS.items[PS.i];
+ c.setLineDash([]);if(PEN.ext){if(PEN.ext.show)penText(c,PEN.ext.t,.4,cssVar('--ok'));return}
+ const it=PS&&PS.items[PS.i];
  if(it&&(PS.trace||PS.shown))penText(c,it.t,PS.trace?.22:.4,PS.trace?PEN.ink:cssVar('--ok'))}
 function penText(c,text,alpha,color){const w=PEN.w,R=PEN.h/PEN.rows,pad=12;let fs=Math.round(R*.48),lines=[text];
  c.save();c.globalAlpha=alpha;c.fillStyle=color;c.textBaseline='alphabetic';c.direction='ltr';c.textAlign='left'; // الصفحة عربي، والكانفاس بياخد اتجاهها لو ما حددناش
