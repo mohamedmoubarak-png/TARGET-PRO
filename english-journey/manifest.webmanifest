@@ -1,18 +1,66 @@
 {
-  "name": "رحلة الإنجليزي A2 → B1",
-  "short_name": "رحلة الإنجليزي",
-  "description": "كل محاور الإنجليزي في مكان واحد: قواعد، نطق، كلمات، استماع، قراءة، كلام، كتابة",
-  "lang": "ar",
-  "dir": "rtl",
-  "start_url": "./index.html#today",
-  "scope": "./",
-  "display": "standalone",
-  "orientation": "portrait",
-  "theme_color": "#8B1A1A",
-  "background_color": "#F4EFEA",
-  "icons": [
-    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
-    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
-  ]
+ "id": "./",
+ "name": "رحلة الإنجليزي A2 → B1",
+ "short_name": "رحلة الإنجليزي",
+ "description": "كل محاور الإنجليزي في مكان واحد لموظفي البنوك: قواعد، نطق، كلمات، استماع، قراءة، كلام، كتابة · تطوير Mohamed Sayed",
+ "lang": "ar",
+ "dir": "rtl",
+ "start_url": "./index.html#today",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "theme_color": "#8B1A1A",
+ "background_color": "#F4EFEA",
+ "icons": [
+  {
+   "src": "icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "icons/icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "categories": [
+  "education",
+  "productivity"
+ ],
+ "screenshots": [
+  {
+   "src": "screenshots/today.jpg",
+   "sizes": "780x1688",
+   "type": "image/jpeg",
+   "form_factor": "narrow",
+   "label": "روتين النهارده"
+  },
+  {
+   "src": "screenshots/text.jpg",
+   "sizes": "780x1688",
+   "type": "image/jpeg",
+   "form_factor": "narrow",
+   "label": "نص الأسبوع بالصوت والأسئلة"
+  },
+  {
+   "src": "screenshots/dialog.jpg",
+   "sizes": "780x1688",
+   "type": "image/jpeg",
+   "form_factor": "narrow",
+   "label": "حوارات الفرع"
+  },
+  {
+   "src": "screenshots/words.jpg",
+   "sizes": "780x1688",
+   "type": "image/jpeg",
+   "form_factor": "narrow",
+   "label": "باقات الكلمات"
+  }
+ ]
 }
