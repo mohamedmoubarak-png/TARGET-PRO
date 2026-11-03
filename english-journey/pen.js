@@ -16,11 +16,11 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random
 
 // ---------- مصادر التمرين ----------
 function hwWordPool(miss){
- if(miss)return Object.values(hwState().miss).map(x=>({t:x.t,m:x.m,e:x.e||''}));
+ if(miss)return Object.values(hwState().miss).map(x=>({t:x.t,m:x.m,e:x.e||'',id:x.id}));
  const A=allWords().filter(c=>c.w.length<=30),started=A.filter(c=>S.cards[c.id]);
  // الكلمات اللي بدأتها في البطاقات، ولو لسه قليلة نزود باقة الأسبوع
  const base=started.length>=10?started:started.concat(A.filter(c=>!S.cards[c.id]&&c.pk===curWeek()));
- return (base.length?base:A).map(c=>({t:c.w,m:c.m,e:c.e}))}
+ return (base.length?base:A).map(c=>({t:c.w,m:c.m,e:c.e,id:c.id}))}
 function hwSentPool(){const w=curWeek(),out=[];
  DIALOGS[w].k.forEach(k=>{if(k[0].split(' ').length>=3&&!/\.\.\./.test(k[0]))out.push({t:k[0],m:k[1]})});
  PHRASES.forEach(g=>g.p.forEach(p=>out.push({t:p[0],m:p[1]})));
@@ -53,7 +53,7 @@ function penStart(mode){const words=mode==='w'||mode==='miss';
 function penQuit(){PS=null;go('pen')}
 
 // ---------- شاشة التمرين ----------
-function vPenRun(){if(!PS)return vPen();if(PS.i>=PS.items.length)return penSummary();
+function vPenRun(){if(!PS)return vPen();actStart('write');if(PS.i>=PS.items.length)return penSummary();
  const it=PS.items[PS.i],n=PS.items.length,three=/–/.test(it.t);
  shell('الكتابة بالقلم',`<div class="row small muted" style="margin-bottom:8px"><span style="flex:1">${PS.trace?'تحسين الخط':PS.words?'إملاء كلمات':'إملاء جمل'} · ${PS.i+1} من ${n}</span><button class="btn sm ghost" onclick="penQuit()">خروج</button></div>
  <div class="bar" style="margin-bottom:10px"><i style="width:${PS.i/n*100}%"></i></div>
@@ -77,7 +77,7 @@ function penReveal(){if(!PS||PS.shown)return;PS.shown=true;const it=PS.items[PS.
  speak(it.t,.85)}
 function penNext(ok){const it=PS.items[PS.i];
  if(ok!==null){const h=hwState(),k=hwKey(it.t);h.n++;
-  if(ok){h.ok++;const m=h.miss[k];if(m&&++m.c>=2)delete h.miss[k]}else h.miss[k]={t:it.t,m:it.m||'',e:it.e||'',c:0};
+  if(ok){h.ok++;const m=h.miss[k];if(m&&++m.c>=2)delete h.miss[k]}else{h.miss[k]={t:it.t,m:it.m||'',e:it.e||'',c:0,id:it.id};wordReview(it)} // الغلط بيرجع للبطاقات كمان
   PS.res.push({t:it.t,ok});save()}
  PS.i++;PS.shown=false;PS.hint=0;vPenRun()}
 function penSummary(){const n=PS.res.length,ok=PS.res.filter(r=>r.ok).length,bad=PS.res.filter(r=>!r.ok);
