@@ -202,7 +202,7 @@ const BASICS={t:'أساسيات البنك والشغل',d:'حسابات، كر�
 function vWords(){const q=queue(),A=allWords(),mine=customWords(),cw=curWeek();
  const G=[{k:0,t:BASICS.t,list:starterWords(),open:true}].concat(PACKS.map(P=>({k:P.wk,t:P.t,list:packWords(P),open:packOpen(P.wk)})));
  shell('الكلمات',`<div class="stats"><div class="stat"><b>${q.length}</b><span>مستنية</span></div><div class="stat"><b>${Object.keys(S.cards).filter(id=>id[0]!=='q').length}</b><span>بدأتها</span></div><div class="stat"><b>${learnedCount()}</b><span>ثابتة</span></div><div class="stat"><b>${A.length}</b><span>متاحة</span></div></div>
- <div class="card" style="margin-top:12px;text-align:center">${q.length?`<p style="margin-top:0">عندك <b>${q.length}</b> بطاقة النهارده (لحد ${NEW_PER_DAY} جديدة في اليوم، وباقة الأسبوع الأول)</p><button class="btn full" onclick="startDeck()">ابدأ المراجعة</button>`:`<p style="margin:0">خلصت بطاقات النهارده 👏 ارجع بكره، أو ضيف كلمات جديدة من القراءة والاستماع.</p>`}</div>
+ <div class="card" style="margin-top:12px;text-align:center">${q.length?`<p style="margin-top:0">عندك <b>${q.length}</b> بطاقة النهارده (لحد ${NEW_PER_DAY} جديدة في اليوم، وباقة الأسبوع الأول)</p><button class="btn full" onclick="startDeck()">ابدأ المراجعة</button><label class="swl"><input type="checkbox" ${S.deckWrite?'checked':''} onchange="S.deckWrite=this.checked;save()"> ✍️ اكتب كل كلمة بالقلم قبل ما تشوف الإجابة</label>`:`<p style="margin:0">خلصت بطاقات النهارده 👏 ارجع بكره، أو ضيف كلمات جديدة من القراءة والاستماع.</p>`}</div>
  ${mistakesCard()}<a class="lnk hi" href="#pen"><div style="font-size:24px">✍️</div><div><b>اكتب الكلمات بالقلم</b><small>إملاء بخط إيدك بالـ <span class="en">S Pen</span>، وبعدين تقارن بالصح</small></div></a>
  <div class="card"><input type="text" id="wsr" dir="auto" placeholder="🔎 دوّر على كلمة أو معنى"><div id="wres"></div></div>
  <div class="h2">الباقات</div>
@@ -223,14 +223,31 @@ function delWord(id){if(!confirm('تمسح الكلمة دي من الدفتر؟
 function startDeck(){actStart('words');sess={q:queue(),i:0,show:false,n:0};card()}
 function card(){if(!sess||!sess.q.length){actStop();const t=today();S.days[t]=S.days[t]||{};S.days[t].words=true;save();
   shell('الكلمات',`<div class="card" style="text-align:center"><h2 style="color:var(--head)">خلصت المراجعة ✓</h2><p>راجعت ${sess?sess.n:0} بطاقة. اتعلّم بند الكلمات في روتين النهارده.</p><button class="btn" onclick="go('today')">رجوع لليوم</button></div>`,'words');sess=null;return}
- const c=sess.q[0];
- shell('الكلمات',`<div class="row small muted" style="margin-bottom:8px"><span style="flex:1">فاضل ${sess.q.length}</span><span>${S.cards[c.id]?'مراجعة':'<span class="pill">جديدة</span>'}</span></div>
+ const c=sess.q[0],WR=!!S.deckWrite,top=`<div class="row small muted" style="margin-bottom:8px"><span style="flex:1">فاضل ${sess.q.length}</span><span>${S.cards[c.id]?'مراجعة':'<span class="pill">جديدة</span>'}</span><button class="chip${WR?' on':''}" onclick="toggleDeckWrite()">✍️ كتابة${WR?' ✓':''}</button></div>`;
+ if(WR)return cardWrite(c,top);
+ shell('الكلمات',`${top}
  <div class="fc" onclick="flip()"><div class="w"${c.w.length>22?' style="font-size:22px"':''}>${esc(c.w)}</div>${sess.show?`<div class="m">${esc(c.m)}</div><div class="ex">${esc(c.e)}</div>`:'<div class="muted small">فكر في المعنى، وبعدين اضغط</div>'}
  <div><button class="say" onclick="event.stopPropagation();speak(${esc(JSON.stringify(c.w+(sess.show&&c.e?'. '+c.e:'')))})">🔊 اسمع</button></div></div>
  ${sess.show?`<div class="rate"><button class="r0" onclick="rate(0)">تاني<small>نسيتها</small></button><button class="r1" onclick="rate(1)">صعبة<small>بالعافية</small></button><button class="r2" onclick="rate(2)">تمام<small>فاكرها</small></button><button class="r3" onclick="rate(3)">سهلة<small>جدًا</small></button></div>`:`<button class="btn full" style="margin-top:12px" onclick="flip()">اظهر المعنى</button>`}
  <button class="btn ghost full" style="margin-top:10px" onclick="go('words')">وقّف</button>`,'words')}
+// وضع الكتابة: قدام البطاقة المعنى، وانت تكتب الكلمة بالقلم. لما تقلبها كتابتك بتفضل، والإجابة بتترسم بالأخضر تحتها
+function cardWrite(c,top){if(sess.penFor!==c.id){PEN.st=[];PEN.cur=null;sess.penFor=c.id}
+ const sayT=c.w+(sess.show&&c.e?'. '+c.e:'');
+ shell('الكلمات',`${top}
+ <div class="fc fcw">${sess.show?`<div class="w"${c.w.length>22?' style="font-size:22px"':''}>${esc(c.w)}</div><div class="m">${esc(c.m)}</div><div class="ex">${esc(c.e)}</div>`:`<div class="m">${esc(c.m)||'—'}</div>${/–/.test(c.w)?'<div class="muted small">اكتب التصريفات التلاتة</div>':''}<div class="muted small">اكتبها بالإنجليزي بالقلم، وبعدين اظهر الإجابة</div>`}
+ <div><button class="say" onclick="speak(${esc(JSON.stringify(sayT))})">🔊 ${sess.show?'اسمع':'اسمعها (تلميح)'}</button></div></div>
+ <div class="pad" id="pad" dir="ltr" style="margin-top:10px"><canvas id="guide" aria-hidden="true"></canvas><canvas id="ink" aria-label="اكتب الكلمة هنا"></canvas></div>
+ <div class="ptools"><button class="btn sm ghost" onclick="penUndo()">↶ تراجع</button><button class="btn sm ghost${PEN.er?' on':''}" id="erb" onclick="penEraser()">🧽 ممحاة</button><button class="btn sm ghost" onclick="penClear()">🗑 مسح</button></div>
+ ${sess.show?`<div class="rate"><button class="r0" onclick="rate(0)">غلط<small>اتكتبت غلط</small></button><button class="r1" onclick="rate(1)">صعبة<small>صح بالعافية</small></button><button class="r2" onclick="rate(2)">صح<small>كتبتها صح</small></button><button class="r3" onclick="rate(3)">سهلة<small>جدًا</small></button></div>`:'<button class="btn full" style="margin-top:12px" onclick="flip()">اظهر الإجابة ✓</button>'}
+ <button class="btn ghost full" style="margin-top:10px" onclick="go('words')">وقّف</button>`,'words');
+ PEN.rows=2;PEN.ext={t:c.w,show:!!sess.show};penLayout();
+ if(document.fonts&&document.fonts.load)document.fonts.load('40px Andika').then(()=>{if($('#guide')&&PEN.ext)penGuides()}).catch(()=>{})}
+function toggleDeckWrite(){S.deckWrite=!S.deckWrite;save();if(sess){sess.show=false;sess.penFor=null;card()}}
 function flip(){if(!sess)return;sess.show=true;card()}
-function rate(r){const c=sess.q.shift();rateCard(c.id,r);sess.n++;if(r===0)sess.q.push(c);sess.show=false;card()}
+function rate(r){const c=sess.q.shift();rateCard(c.id,r);sess.n++;
+ // في وضع الكتابة: «غلط» بيدخل الكلمة «أخطائي في الكتابة» كمان
+ if(S.deckWrite){const h=hwState(),k=hwKey(c.w);h.n++;if(r>0){h.ok++;const m=h.miss[k];if(m&&++m.c>=2)delete h.miss[k]}else h.miss[k]={t:c.w,m:c.m||'',e:c.e||'',c:0,id:c.id}}
+ if(r===0)sess.q.push(c);sess.show=false;sess.penFor=null;card()}
 
 // ---------- الخطة ----------
 function vPlan(){const cw=curWeek();
