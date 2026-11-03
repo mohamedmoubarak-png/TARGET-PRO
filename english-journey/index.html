@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Noto+Naskh+Arabic:wght@400;600;700&family=Andika:wght@400;700&display=swap" rel="stylesheet">
 <style>
 /* One-column mobile app: bottom nav with 5 views (اليوم، المحاور، الكلمات، الخطة، التقدم); content cards in the notebook palette. */
 :root{color-scheme:light;
@@ -136,6 +136,20 @@ pre.mdl{white-space:pre-wrap;direction:ltr;text-align:left;font-family:var(--f-e
 .fc .w{overflow-wrap:anywhere}
 .inst{border:2px solid var(--gold)}
 .dev{text-align:center;font-size:12.5px;color:var(--muted);margin:14px 0 4px}
+.pad{position:relative;background:var(--card);border:1.5px solid var(--line);border-radius:16px;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.pad canvas{position:absolute;top:0;left:0;display:block}
+#ink{touch-action:none;cursor:crosshair}
+.ptools{display:flex;gap:6px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.ptools .on{background:var(--gold-l);border-color:var(--gold)}
+.pq{text-align:center}
+.pm{font-size:22px;font-weight:800}
+.phint{letter-spacing:1px;font-size:20px;margin-top:6px;color:var(--head);direction:ltr}
+.hw{font-family:"Andika","Segoe UI",sans-serif;font-size:30px;direction:ltr;text-align:left;color:var(--ok);line-height:1.35;margin:6px 0}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.sheet-in{background:var(--card);color:var(--text);width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:80vh;overflow:auto}
+.sheet-h{font-size:19px;font-weight:800;color:var(--head)}
+.sheet ul{margin:6px 0 14px;padding-inline-start:20px;line-height:1.8}
+.updbar{position:fixed;top:calc(62px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:456px;background:var(--red);color:#fff;border-radius:14px;padding:8px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:70;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--card);border-top:1px solid var(--line);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:30}
 .nav button{flex:1;background:none;border:0;color:var(--muted);font-size:11.5px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;border-radius:10px}
 .nav button svg{width:24px;height:24px}
@@ -154,6 +168,8 @@ pre.mdl{white-space:pre-wrap;direction:ltr;text-align:left;font-family:var(--f-e
 <script src="data.js"></script>
 <script src="packs.js"></script>
 <script src="lessons.js"></script>
+<script src="version.js"></script>
+<script src="pen.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
