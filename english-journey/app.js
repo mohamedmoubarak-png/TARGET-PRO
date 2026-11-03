@@ -3,7 +3,6 @@
 const KEY='ej_state_v1';
 const LV_BANDS=[[0,30,'A1'],[31,40,'A2'],[41,50,'B1'],[51,60,'B2'],[61,70,'C1'],[71,100,'C2']];
 const NEW_PER_DAY=15;
-const APP_VERSION='2.0';
 const DEV_NAME='Mohamed Sayed';
 
 // ---------- التخزين ----------
@@ -54,6 +53,7 @@ const AXES=[
  {k:'read',t:'القراءة',s:'Reading',ic:'¶',d:'12 نص بأسئلة فهم + مصادر'},
  {k:'speak',t:'الكلام',s:'Speaking',ic:'“ ”',d:'12 حوار + بنك العبارات'},
  {k:'write',t:'الكتابة',s:'Writing',ic:'✎',d:'9 نماذج + يوميات + تصحيح'},
+ {k:'pen',t:'الكتابة بالقلم',s:'S Pen',ic:'✍',d:'إملاء بخط إيدك + تحسين الخط'},
 ];
 
 // ---------- البطاقات (تكرار متباعد) ----------
@@ -90,7 +90,7 @@ function shell(title,body,tab){
 function go(h){sess=null;dl=null;if(location.hash==='#'+h)route();else location.hash=h}
 function route(){if(timerInt){clearInterval(timerInt);timerInt=null}stopSpeak();if(dl&&location.hash!=='#dlg-'+dl.n)dl=null;
  const h=(location.hash||'#today').slice(1).split('-');
- const R={today:vToday,axes:vAxes,ax:()=>vAx(h[1]),words:vWords,plan:vPlan,week:()=>vWeek(+h[1]),progress:vProgress,prefs:vSettings,timer:()=>vTimer(h[1]),text:()=>vText(h[1]),dlg:()=>vDlg(h[1]),phrases:vPhrases,model:()=>vModel(h[1]),pack:()=>vPack(h[1])};
+ const R={today:vToday,axes:vAxes,ax:()=>vAx(h[1]),words:vWords,plan:vPlan,week:()=>vWeek(+h[1]),progress:vProgress,prefs:vSettings,timer:()=>vTimer(h[1]),text:()=>vText(h[1]),dlg:()=>vDlg(h[1]),phrases:vPhrases,model:()=>vModel(h[1]),pack:()=>vPack(h[1]),pen:()=>vPen(),penrun:()=>vPenRun()};
  (R[h[0]]||vToday)()}
 window.addEventListener('hashchange',route);
 
@@ -142,6 +142,7 @@ function vAxes(){shell('المحاور',`<p class="muted" style="margin-top:0">�
  <div class="grid2">${AXES.map(a=>`<button class="ax" onclick="go('ax-${a.k}')"><div class="ic">${a.ic}</div><b>${a.t}</b><span class="en">${a.s}</span><br><span>${a.d}</span></button>`).join('')}</div>`,'axes')}
 function vAx(k){const w=curWeek(),Wk=W[w],L=weekLinks(w);
  if(k==='words')return vWords();
+ if(k==='pen')return vPen();
  if(k==='grammar')return shell('القواعد',`<div class="card"><span class="lbl">درس الأسبوع ${w}</span><p>${tx(Wk.g)}</p><p>${L.g}</p></div>
   <a class="lnk" href="notes/grammar.html"><div class="ic" style="font-size:22px">📘</div><div><b>مذكرة القواعد كاملة</b><small>18 درس · حالات خادعة · كبسولة</small></div></a>
   <a class="lnk" href="notes/grammar.html#quiz"><div style="font-size:22px">✅</div><div><b>اختبار القواعد</b><small>86 سؤال بالشرح · راجع الغلط</small></div></a>
@@ -186,7 +187,7 @@ function markDone(k){const t=today();S.days[t]=S.days[t]||{};S.days[t][k]=true;s
 
 // ---------- الكتابة ----------
 function vWrite(){const t=today(),jtx=S.journal[t]||'',past=Object.keys(S.journal).filter(k=>k!==t&&S.journal[k].trim()).sort().reverse().slice(0,7);
- shell('الكتابة',`${modelCard()}<div class="card"><span class="lbl">يوميات ${t}</span><p class="small muted">5 جمل بس عن يومك. استعمل قاعدة الأسبوع: ${tx(W[curWeek()].g)}</p>
+ shell('الكتابة',`${modelCard()}<a class="lnk" href="#pen"><div style="font-size:24px">✍️</div><div><b>الكتابة بالقلم</b><small>إملاء كلمات وجمل بخط إيدك، وتمرين تحسين الخط</small></div></a><div class="card"><span class="lbl">يوميات ${t}</span><p class="small muted">5 جمل بس عن يومك. استعمل قاعدة الأسبوع: ${tx(W[curWeek()].g)}</p>
  <textarea id="jt" placeholder="Today I ...">${esc(jtx)}</textarea>
  <div class="row" style="margin-top:8px"><span class="muted small" id="wc" style="flex:1"></span><button class="btn sm gold" onclick="copyFix()">انسخ للتصحيح</button></div></div>
  ${past.length?`<div class="h2">اللي كتبته قبل كده</div>`+past.map(k=>`<div class="card"><span class="pill en">${k}</span><p class="en" style="white-space:pre-wrap;text-align:left;margin:6px 0 0">${esc(S.journal[k])}</p></div>`).join(''):''}${allModels()}`,'axes');
@@ -201,6 +202,7 @@ function vWords(){const q=queue(),A=allWords(),mine=customWords(),cw=curWeek();
  const G=[{k:0,t:BASICS.t,list:starterWords(),open:true}].concat(PACKS.map(P=>({k:P.wk,t:P.t,list:packWords(P),open:packOpen(P.wk)})));
  shell('الكلمات',`<div class="stats"><div class="stat"><b>${q.length}</b><span>مستنية</span></div><div class="stat"><b>${Object.keys(S.cards).length}</b><span>بدأتها</span></div><div class="stat"><b>${learnedCount()}</b><span>ثابتة</span></div><div class="stat"><b>${A.length}</b><span>متاحة</span></div></div>
  <div class="card" style="margin-top:12px;text-align:center">${q.length?`<p style="margin-top:0">عندك <b>${q.length}</b> بطاقة النهارده (لحد ${NEW_PER_DAY} جديدة في اليوم، وباقة الأسبوع الأول)</p><button class="btn full" onclick="startDeck()">ابدأ المراجعة</button>`:`<p style="margin:0">خلصت بطاقات النهارده 👏 ارجع بكره، أو ضيف كلمات جديدة من القراءة والاستماع.</p>`}</div>
+ <a class="lnk hi" href="#pen"><div style="font-size:24px">✍️</div><div><b>اكتب الكلمات بالقلم</b><small>إملاء بخط إيدك بالـ <span class="en">S Pen</span>، وبعدين تقارن بالصح</small></div></a>
  <div class="card"><input type="text" id="wsr" dir="auto" placeholder="🔎 دوّر على كلمة أو معنى"><div id="wres"></div></div>
  <div class="h2">الباقات</div>
  ${G.map(g=>{const s=packStat(g.list);return `<button class="week ${g.k===cw?'cur':''}" onclick="go('pack-${g.k}')"><div class="n">${g.k||'★'}</div><div class="tt"><b>${esc(g.t)}</b><small>${g.open?`بدأت ${s.seen} من ${s.n} · ثابتة ${s.fixed}`:`بتفتح في الأسبوع ${g.k}`}</small></div><span class="pill">${g.open?s.n:'🔒'}</span></button>`}).join('')}
@@ -361,5 +363,23 @@ function hideInstall(){S.hideInstall=true;save();route()}
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;const h=location.hash||'#today';if(h==='#today'||h==='#prefs')route()});
 window.addEventListener('appinstalled',()=>{installEvt=null;toast('التطبيق اتثبت ✓')});
 
-applyTheme();route();
+// ---------- التحديثات ----------
+function vNum(v){const p=String(v).split('.').map(Number);return (p[0]||0)*1000+(p[1]||0)}
+// بعد ما الإصدار يتغير: «تم التحديث» واللي اتضاف من آخر إصدار شفته
+function checkUpdated(){const prev=S.seenVersion||(Object.keys(S.days).length?'2.0':'');
+ if(prev&&vNum(prev)<vNum(APP_VERSION))showWhatsNew(prev);
+ if(S.seenVersion!==APP_VERSION){S.seenVersion=APP_VERSION;save()}}
+function showWhatsNew(prev){const news=CHANGELOG.filter(c=>vNum(c.v)>vNum(prev));if(!news.length)return;
+ const b=document.createElement('div');b.className='sheet';b.setAttribute('role','dialog');b.onclick=e=>{if(e.target===b)b.remove()};
+ b.innerHTML=`<div class="sheet-in"><div class="sheet-h">✨ تم التحديث للإصدار <span class="en">${APP_VERSION}</span></div>${news.map(c=>`<div class="small muted" style="margin-top:10px">الجديد في <span class="en">${c.v}</span></div><ul>${c.items.map(x=>`<li>${tx(x)}</li>`).join('')}</ul>`).join('')}<button class="btn full" onclick="this.closest('.sheet').remove()">تمام</button></div>`;
+ document.body.appendChild(b)}
+// والتطبيق مفتوح: بنسأل عن رقم الإصدار لما ترجعله، وكل نص ساعة
+let updShown=false;
+async function checkRemote(){if(updShown||!navigator.onLine)return;try{const r=await fetch('version.js',{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/v:'([\d.]+)'/);
+ if(m&&vNum(m[1])>vNum(APP_VERSION)){updShown=true;const b=document.createElement('div');b.className='updbar';b.innerHTML=`<span>🔄 فيه تحديث جديد (<span class="en">${m[1]}</span>)</span><button class="btn sm gold" onclick="applyUpdate()">حدّث دلوقتي</button>`;document.body.appendChild(b)}}catch(e){}}
+async function applyUpdate(){try{const r=await navigator.serviceWorker.getRegistration();if(r)await r.update()}catch(e){}location.reload()}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkRemote()});
+setInterval(checkRemote,30*60*1000);
+
+applyTheme();route();checkUpdated();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}})}
