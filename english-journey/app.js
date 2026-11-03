@@ -6,10 +6,10 @@ const NEW_PER_DAY=15;
 const DEV_NAME='Mohamed Sayed';
 
 // ---------- التخزين ----------
-function defState(){return{start:'',theme:'auto',level:'A2',days:{},mins:{},plan:{},cards:{},custom:[],newSeen:{},journal:{},scores:[],open:{},texts:{},drafts:{}}}
+function defState(){return{start:'',theme:'auto',level:'A2',days:{},mins:{},plan:{},cards:{},custom:[],newSeen:{},journal:{},scores:[],open:{},texts:{},drafts:{},qmiss:{},checks:{},tsec:{},remind:{on:false,t:'20:00'}}}
 let S=defState();
 function load(){try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(defState(),JSON.parse(r))}catch(e){}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{writeMeta()}catch(e){}}
 load();
 if(!S.start){S.start=today();save()}
 
@@ -77,7 +77,7 @@ function rateCard(id,r){const t=today();let c=S.cards[id];
   else{c.ivl=c.reps===0?3:Math.round(Math.max(c.ivl,1)*c.ease*1.3);c.ease+=.15}
   c.reps++;c.due=addDays(t,c.ivl)}
  S.cards[id]=c;save()}
-function learnedCount(){return Object.values(S.cards).filter(c=>c.ivl>=3).length}
+function learnedCount(){return Object.entries(S.cards).filter(([id,c])=>id[0]!=='q'&&c.ivl>=3).length}
 
 // ---------- الهيكل ----------
 let sess=null,timerInt=null,mediaRec=null,recUrl='',dl=null,tAns={};
@@ -88,15 +88,15 @@ function shell(title,body,tab){
  <nav class="nav">${nav.map(n=>`<button class="${tab===n[0]?'on':''}" onclick="go('${n[0]}')">${IC[n[0]]}${n[1]}</button>`).join('')}</nav>`;
  window.scrollTo(0,0)}
 function go(h){sess=null;dl=null;if(location.hash==='#'+h)route();else location.hash=h}
-function route(){if(timerInt){clearInterval(timerInt);timerInt=null}stopSpeak();if(dl&&location.hash!=='#dlg-'+dl.n)dl=null;
+function route(){timerFlush();actStop();if(timerInt){clearInterval(timerInt);timerInt=null}stopSpeak();if(dl&&location.hash!=='#dlg-'+dl.n)dl=null;
  const h=(location.hash||'#today').slice(1).split('-');
- const R={today:vToday,axes:vAxes,ax:()=>vAx(h[1]),words:vWords,plan:vPlan,week:()=>vWeek(+h[1]),progress:vProgress,prefs:vSettings,timer:()=>vTimer(h[1]),text:()=>vText(h[1]),dlg:()=>vDlg(h[1]),phrases:vPhrases,model:()=>vModel(h[1]),pack:()=>vPack(h[1]),pen:()=>vPen(),penrun:()=>vPenRun()};
+ const R={today:vToday,axes:vAxes,ax:()=>vAx(h[1]),words:vWords,plan:vPlan,week:()=>vWeek(+h[1]),progress:vProgress,prefs:vSettings,timer:()=>vTimer(h[1]),text:()=>vText(h[1]),dlg:()=>vDlg(h[1]),phrases:vPhrases,model:()=>vModel(h[1]),pack:()=>vPack(h[1]),pen:()=>vPen(),penrun:()=>vPenRun(),check:()=>vCheck(h[1]),mistakes:()=>vMistakes()};
  (R[h[0]]||vToday)()}
 window.addEventListener('hashchange',route);
 
 // ---------- اليوم ----------
 function vToday(){const t=today(),w=curWeek(),Wk=W[w],d=S.days[t]||{},L=weekLinks(w),q=queue().length;
- const done=dayDone(t),mins=ROUTINE.filter(r=>d[r.k]).reduce((a,r)=>a+r.m,0);
+ const done=dayDone(t),mins=Math.round(ROUTINE.reduce((a,r)=>a+minutesFor(t,r.k),0));
  const n=dayInPlan();
  const body=`${installCard()}
  <div class="hero"><small>${phaseLabel()} · الأسبوع ${w} من 12 · اليوم ${Math.max(1,n)}</small>
@@ -106,7 +106,7 @@ function vToday(){const t=today(),w=curWeek(),Wk=W[w],d=S.days[t]||{},L=weekLink
  <div class="bar" style="margin-bottom:12px"><i style="width:${done/6*100}%"></i></div>
  ${ROUTINE.map(r=>`<div class="task ${d[r.k]?'done':''}">
    <button class="chk" onclick="tick('${r.k}')" aria-label="تم">${d[r.k]?'✓':''}</button>
-   <div class="tx" onclick="go('ax-${r.ax}')"><b>${r.t} <span class="muted small">${r.m} د</span></b><span>${r.k==='words'?`${q} بطاقة مستنية مراجعة`:tx(r.d)}</span></div>
+   <div class="tx" onclick="go('ax-${r.ax}')"><b>${r.t} <span class="muted small">${!d[r.k]&&actualMin(t,r.k)>=1?Math.floor(actualMin(t,r.k))+'/':''}${r.m} د</span></b><span>${r.k==='words'?`${q} بطاقة مستنية مراجعة`:tx(r.d)}</span></div>
    <button class="btn sm ghost" onclick="go('timer-${r.k}')" aria-label="مؤقت">⏱</button></div>`).join('')}
  <div class="stats" style="margin-top:12px">
   <div class="stat"><b>${streak()}</b><span>أيام متتالية</span></div>
@@ -115,7 +115,8 @@ function vToday(){const t=today(),w=curWeek(),Wk=W[w],d=S.days[t]||{},L=weekLink
   <div class="stat"><b>${S.level}</b><span>مستواك</span></div></div>
  <div class="card" style="margin-top:12px"><span class="lbl">🎯 مهام الأسبوع ${w}</span>
   ${Wk.task.map((x,i)=>`<div class="wl"><span>${tx(x)}</span><button class="chk" style="width:24px;height:24px" onclick="ptick(${w},${i})" aria-label="تمت المهمة">${S.plan['w'+w+'t'+i]?'✓':''}</button></div>`).join('')}
-  <div class="small muted" style="margin-top:6px">✅ علامة النجاح: ${tx(Wk.ck)}</div></div>
+  <div class="small muted" style="margin-top:6px">✅ علامة النجاح: ${tx(Wk.ck)}</div>${checkBtn(w)}</div>
+ ${mistakesCard()}
  ${needBackup()?`<div class="card" style="border-color:var(--gold)"><span class="lbl">💾 خد نسخة احتياطية</span><p class="small muted" style="margin:0 0 8px">${S.lastBackup?'آخر نسخة من '+diffDays(S.lastBackup,t)+' يوم':'لسه ما خدتش أي نسخة'}. كل تقدمك محفوظ على الموبايل ده بس.</p><button class="btn sm gold" onclick="exportData()">⬇ تصدير دلوقتي</button></div>`:''}
  <div class="small muted" style="text-align:center">يوم بيتحسب في السلسلة لو خلصت 3 حاجات على الأقل</div>
  <div class="dev">تطوير <span class="en">${DEV_NAME}</span></div>`;
@@ -133,8 +134,8 @@ function vTimer(k){const r=ROUTINE.find(x=>x.k===k)||ROUTINE[0];let left=r.m*60,
   <div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="tb">ابدأ</button><button class="btn ghost" onclick="go('ax-${r.ax}')">افتح المحور</button></div></div>
   <button class="btn ghost full" onclick="go('today')">→ رجوع لليوم</button>`,'today');
  const tb=$('#tb');tb.onclick=()=>{run=!run;tb.textContent=run?'إيقاف مؤقت':'كمّل';
-  if(run){end=Date.now()+left*1000;timerInt=setInterval(()=>{left=Math.max(0,Math.round((end-Date.now())/1000));$('#tm').textContent=fmt(left);if(left<=0){clearInterval(timerInt);timerInt=null;beep();const t=today();S.days[t]=S.days[t]||{};S.days[t][k]=true;save();toast('الوقت خلص ✓ اتعلّمت');setTimeout(()=>go('today'),1200)}},500)}
-  else{clearInterval(timerInt);timerInt=null}}}
+  if(run){end=Date.now()+left*1000;tmr={k,since:Date.now()};timerInt=setInterval(()=>{left=Math.max(0,Math.round((end-Date.now())/1000));$('#tm').textContent=fmt(left);if(left<=0){clearInterval(timerInt);timerInt=null;timerFlush();beep();const t=today();S.days[t]=S.days[t]||{};S.days[t][k]=true;save();toast('الوقت خلص ✓ اتعلّمت');setTimeout(()=>go('today'),1200)}},500)}
+  else{clearInterval(timerInt);timerInt=null;timerFlush()}}}
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 
 // ---------- المحاور ----------
@@ -143,7 +144,7 @@ function vAxes(){shell('المحاور',`<p class="muted" style="margin-top:0">�
 function vAx(k){const w=curWeek(),Wk=W[w],L=weekLinks(w);
  if(k==='words')return vWords();
  if(k==='pen')return vPen();
- if(k==='grammar')return shell('القواعد',`<div class="card"><span class="lbl">درس الأسبوع ${w}</span><p>${tx(Wk.g)}</p><p>${L.g}</p></div>
+ if(k==='grammar')return shell('القواعد',`<div class="card"><span class="lbl">درس الأسبوع ${w}</span><p>${tx(Wk.g)}</p><p>${L.g}</p>${checkBtn(w)}</div>${mistakesCard()}
   <a class="lnk" href="notes/grammar.html"><div class="ic" style="font-size:22px">📘</div><div><b>مذكرة القواعد كاملة</b><small>18 درس · حالات خادعة · كبسولة</small></div></a>
   <a class="lnk" href="notes/grammar.html#quiz"><div style="font-size:22px">✅</div><div><b>اختبار القواعد</b><small>86 سؤال بالشرح · راجع الغلط</small></div></a>
   ${promptCard(2)}`,'axes');
@@ -168,7 +169,7 @@ function fillP(p){return p.replace(/\{LV\}/g,S.level).replace(/\{G\}/g,W[curWeek
 function promptCard(i){const P=PROMPTS[i];return `<div class="card"><span class="lbl">💬 ${esc(P.t)} (معايا)</span><pre class="pr">${esc(fillP(P.p))}</pre><button class="btn sm gold" onclick="copy(fillP(PROMPTS[${i}].p))">انسخ وابعتهولي</button></div>`}
 
 // ---------- الكلام ----------
-function vSpeak(){const w=curWeek(),D=DIALOGS[w];shell('الكلام',`<a class="lnk hi" href="#dlg-${w}"><div style="font-size:24px">🎭</div><div><b>حوار الأسبوع ${w}: <span class="en">${esc(D.t)}</span></b><small>${esc(D.sit)}</small></div></a>
+function vSpeak(){actStart('speak');const w=curWeek(),D=DIALOGS[w];shell('الكلام',`<a class="lnk hi" href="#dlg-${w}"><div style="font-size:24px">🎭</div><div><b>حوار الأسبوع ${w}: <span class="en">${esc(D.t)}</span></b><small>${esc(D.sit)}</small></div></a>
  <a class="lnk" href="#phrases"><div style="font-size:24px">💼</div><div><b>بنك العبارات</b><small>${PHRASES.reduce((a,g)=>a+g.p.length,0)} عبارة للشغل في ${PHRASES.length} مواقف</small></div></a>
  <div class="card" style="text-align:center"><span class="lbl">سجّل صوتك</span><p class="small muted">اتكلم دقيقتين عن موضوع الأسبوع، واسمع نفسك وقارن بالأصل.</p>
  <button class="rec" id="rb">● سجل</button><div id="pl"></div></div>
@@ -186,7 +187,7 @@ async function toggleRec(){const b=$('#rb');
 function markDone(k){const t=today();S.days[t]=S.days[t]||{};S.days[t][k]=true;save();toast('اتعلّم ✓')}
 
 // ---------- الكتابة ----------
-function vWrite(){const t=today(),jtx=S.journal[t]||'',past=Object.keys(S.journal).filter(k=>k!==t&&S.journal[k].trim()).sort().reverse().slice(0,7);
+function vWrite(){actStart('write');const t=today(),jtx=S.journal[t]||'',past=Object.keys(S.journal).filter(k=>k!==t&&S.journal[k].trim()).sort().reverse().slice(0,7);
  shell('الكتابة',`${modelCard()}<a class="lnk" href="#pen"><div style="font-size:24px">✍️</div><div><b>الكتابة بالقلم</b><small>إملاء كلمات وجمل بخط إيدك، وتمرين تحسين الخط</small></div></a><div class="card"><span class="lbl">يوميات ${t}</span><p class="small muted">5 جمل بس عن يومك. استعمل قاعدة الأسبوع: ${tx(W[curWeek()].g)}</p>
  <textarea id="jt" placeholder="Today I ...">${esc(jtx)}</textarea>
  <div class="row" style="margin-top:8px"><span class="muted small" id="wc" style="flex:1"></span><button class="btn sm gold" onclick="copyFix()">انسخ للتصحيح</button></div></div>
@@ -200,9 +201,9 @@ function wordRow(c){return `<div class="wd"><div class="row" style="flex-wrap:no
 const BASICS={t:'أساسيات البنك والشغل',d:'حسابات، كروت، قروض، ديجيتال، خدمة العملاء، والشغل'};
 function vWords(){const q=queue(),A=allWords(),mine=customWords(),cw=curWeek();
  const G=[{k:0,t:BASICS.t,list:starterWords(),open:true}].concat(PACKS.map(P=>({k:P.wk,t:P.t,list:packWords(P),open:packOpen(P.wk)})));
- shell('الكلمات',`<div class="stats"><div class="stat"><b>${q.length}</b><span>مستنية</span></div><div class="stat"><b>${Object.keys(S.cards).length}</b><span>بدأتها</span></div><div class="stat"><b>${learnedCount()}</b><span>ثابتة</span></div><div class="stat"><b>${A.length}</b><span>متاحة</span></div></div>
+ shell('الكلمات',`<div class="stats"><div class="stat"><b>${q.length}</b><span>مستنية</span></div><div class="stat"><b>${Object.keys(S.cards).filter(id=>id[0]!=='q').length}</b><span>بدأتها</span></div><div class="stat"><b>${learnedCount()}</b><span>ثابتة</span></div><div class="stat"><b>${A.length}</b><span>متاحة</span></div></div>
  <div class="card" style="margin-top:12px;text-align:center">${q.length?`<p style="margin-top:0">عندك <b>${q.length}</b> بطاقة النهارده (لحد ${NEW_PER_DAY} جديدة في اليوم، وباقة الأسبوع الأول)</p><button class="btn full" onclick="startDeck()">ابدأ المراجعة</button>`:`<p style="margin:0">خلصت بطاقات النهارده 👏 ارجع بكره، أو ضيف كلمات جديدة من القراءة والاستماع.</p>`}</div>
- <a class="lnk hi" href="#pen"><div style="font-size:24px">✍️</div><div><b>اكتب الكلمات بالقلم</b><small>إملاء بخط إيدك بالـ <span class="en">S Pen</span>، وبعدين تقارن بالصح</small></div></a>
+ ${mistakesCard()}<a class="lnk hi" href="#pen"><div style="font-size:24px">✍️</div><div><b>اكتب الكلمات بالقلم</b><small>إملاء بخط إيدك بالـ <span class="en">S Pen</span>، وبعدين تقارن بالصح</small></div></a>
  <div class="card"><input type="text" id="wsr" dir="auto" placeholder="🔎 دوّر على كلمة أو معنى"><div id="wres"></div></div>
  <div class="h2">الباقات</div>
  ${G.map(g=>{const s=packStat(g.list);return `<button class="week ${g.k===cw?'cur':''}" onclick="go('pack-${g.k}')"><div class="n">${g.k||'★'}</div><div class="tt"><b>${esc(g.t)}</b><small>${g.open?`بدأت ${s.seen} من ${s.n} · ثابتة ${s.fixed}`:`بتفتح في الأسبوع ${g.k}`}</small></div><span class="pill">${g.open?s.n:'🔒'}</span></button>`}).join('')}
@@ -219,8 +220,8 @@ function openPack(k){S.open[k]=true;save();toast('الباقة اتفتحت ✓ 
 function addWord(){const w=$('#nw').value.trim(),m=$('#nm').value.trim(),e=$('#ne').value.trim();if(!w)return toast('اكتب الكلمة');
  if(everyWord().some(c=>c.w.toLowerCase()===w.toLowerCase()))return toast('الكلمة دي موجودة في الدفتر');S.custom.push([w,m,e]);save();toast('اتضافت ✓');route()}
 function delWord(id){if(!confirm('تمسح الكلمة دي من الدفتر؟'))return;S.custom[+id.slice(1)]=null;delete S.cards[id];save();toast('اتمسحت');route()}
-function startDeck(){sess={q:queue(),i:0,show:false,n:0};card()}
-function card(){if(!sess||!sess.q.length){const t=today();S.days[t]=S.days[t]||{};S.days[t].words=true;save();
+function startDeck(){actStart('words');sess={q:queue(),i:0,show:false,n:0};card()}
+function card(){if(!sess||!sess.q.length){actStop();const t=today();S.days[t]=S.days[t]||{};S.days[t].words=true;save();
   shell('الكلمات',`<div class="card" style="text-align:center"><h2 style="color:var(--head)">خلصت المراجعة ✓</h2><p>راجعت ${sess?sess.n:0} بطاقة. اتعلّم بند الكلمات في روتين النهارده.</p><button class="btn" onclick="go('today')">رجوع لليوم</button></div>`,'words');sess=null;return}
  const c=sess.q[0];
  shell('الكلمات',`<div class="row small muted" style="margin-bottom:8px"><span style="flex:1">فاضل ${sess.q.length}</span><span>${S.cards[c.id]?'مراجعة':'<span class="pill">جديدة</span>'}</span></div>
@@ -235,24 +236,24 @@ function rate(r){const c=sess.q.shift();rateCard(c.id,r);sess.n++;if(r===0)sess.
 function vPlan(){const cw=curWeek();
  shell('الخطة',`<div class="card"><span class="lbl">${phaseLabel()}</span><p class="small" style="margin:0">12 أسبوع · 2.5–3 ساعات في اليوم. الهدف الواقعي: B1 ثابت (أو B1+ بـ 3 ساعات). بعدها نبني المرحلة التانية B1 → B2.</p>
  <label class="f" for="sd">بدأت يوم</label><input type="date" id="sd" value="${S.start}" onchange="S.start=this.value||today();save();route()"></div>
- ${Object.keys(W).map(n=>{n=+n;const dn=W[n].task.filter((_,i)=>S.plan['w'+n+'t'+i]).length;return `<button class="week ${n===cw?'cur':''}" onclick="go('week-${n}')"><div class="n">${n}</div><div class="tt"><b>${tx(W[n].t)}</b><small>${tx(W[n].g)}</small></div><span class="pill">${dn}/${W[n].task.length}</span></button>`}).join('')}`,'plan')}
+ ${Object.keys(W).map(n=>{n=+n;const dn=W[n].task.filter((_,i)=>S.plan['w'+n+'t'+i]).length;return `<button class="week ${n===cw?'cur':''}" onclick="go('week-${n}')"><div class="n">${n}</div><div class="tt"><b>${tx(W[n].t)}</b><small>${tx(W[n].g)}${S.checks[n]?' · 🎯 '+S.checks[n].best+'/10':''}</small></div><span class="pill">${dn}/${W[n].task.length}</span></button>`}).join('')}`,'plan')}
 function vWeek(n){if(!W[n])return vPlan();const Wk=W[n],L=weekLinks(n);
  shell('الأسبوع '+n,`<div class="hero"><small>الأسبوع ${n}${n===curWeek()?' · الأسبوع الحالي':''}</small><h2>${tx(Wk.t)}</h2>
  <div class="ln">📘 ${tx(Wk.g)}<br>${L.g}<br>🔊 ${tx(Wk.p)}<br>${L.p}<br>🗂 ${tx(Wk.v)}<br>📄 <a href="#text-${n}" class="en">${esc(TEXTS[n].t)}</a> · 🎭 <a href="#dlg-${n}" class="en">${esc(DIALOGS[n].t)}</a><br>🎧 ${tx(Wk.l)}</div></div>
  <div class="h2">المهام</div>${Wk.task.map((x,i)=>{const on=S.plan['w'+n+'t'+i];return `<div class="task ${on?'done':''}"><button class="chk" onclick="ptick(${n},${i})" aria-label="تمت المهمة">${on?'✓':''}</button><div class="tx"><b style="font-weight:600">${tx(x)}</b></div></div>`}).join('')}
- <div class="card"><span class="lbl">✅ تنتقل للأسبوع اللي بعده لما</span>${tx(Wk.ck)}</div>
+ <div class="card"><span class="lbl">✅ تنتقل للأسبوع اللي بعده لما</span>${tx(Wk.ck)}<br>${checkBtn(n)}</div>
  <div class="row"><button class="btn ghost" style="flex:1" ${n<=1?'disabled':''} onclick="go('week-${n-1}')">→ السابق</button><button class="btn ghost" style="flex:1" ${n>=12?'disabled':''} onclick="go('week-${n+1}')">التالي ←</button></div>`,'plan')}
 
 // ---------- التقدم ----------
 function vProgress(){const sc=S.scores.slice().sort((a,b)=>a.d<b.d?-1:1);
- let active=0,totM=0;Object.keys(S.days).forEach(k=>{const n=dayDone(k);if(n>=3)active++;totM+=ROUTINE.filter(r=>S.days[k][r.k]).reduce((a,r)=>a+r.m,0)});
+ let active=0,totM=0;new Set([...Object.keys(S.days),...Object.keys(S.tsec),...Object.keys(S.mins)]).forEach(k=>{if(dayDone(k)>=3)active++;totM+=ROUTINE.reduce((a,r)=>a+minutesFor(k,r.k),0)});
  shell('التقدم',`<div class="stats"><div class="stat"><b>${streak()}</b><span>سلسلة</span></div><div class="stat"><b>${active}</b><span>يوم شغال</span></div><div class="stat"><b>${Math.round(totM/6)/10}</b><span>ساعة</span></div><div class="stat"><b>${S.level}</b><span>المستوى</span></div></div>
  <div class="card" style="margin-top:12px"><span class="lbl">نتيجة EF SET</span><p class="small muted" style="margin-top:0">اعمل الاختبار في الأسبوع 1 و4 و8 و12 وسجّل النتيجة هنا (من 100).</p>
   <div class="row"><input type="number" id="es" min="0" max="100" placeholder="مثلاً 38" style="flex:1"><button class="btn" onclick="addScore()">سجّل</button></div>
   <a class="small" href="https://www.efset.org" target="_blank" rel="noopener">افتح EF SET ↗</a>
   ${sc.length?chart(sc):''}
   ${sc.map((x,i)=>`<div class="wl"><span class="en">${x.d}</span><b>${x.s} · ${lvFromScore(x.s)}</b><button class="say" onclick="delScore(${S.scores.indexOf(x)})">✕</button></div>`).join('')}</div>
- ${textsProgress()}<div class="card small"><span class="lbl">مفتاح المستويات</span><div class="lvk">${LV_BANDS.map(b=>`<span class="pill en">${b[2]}: ${b[0]}–${b[1]}</span>`).join('')}</div></div>
+ ${checksProgress()}${textsProgress()}<div class="card small"><span class="lbl">مفتاح المستويات</span><div class="lvk">${LV_BANDS.map(b=>`<span class="pill en">${b[2]}: ${b[0]}–${b[1]}</span>`).join('')}</div></div>
  <div class="card"><span class="lbl">آخر 28 يوم</span><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;direction:ltr">${Array.from({length:28},(_,i)=>{const d=addDays(today(),i-27),n=dayDone(d);return `<div title="${d}" style="aspect-ratio:1;border-radius:6px;background:${n===0?'var(--soft)':n<3?'var(--gold-l)':n<6?'var(--gold)':'var(--red)'};border:1px solid var(--line)"></div>`}).join('')}</div></div>`,'progress')}
 function chart(sc){const w=300,h=140,p=22,xs=i=>sc.length===1?w/2:p+i*(w-2*p)/(sc.length-1),ys=v=>h-p-(v/100)*(h-2*p);
  const lines=[30,40,50,60,70].map(v=>`<line x1="${p}" x2="${w-p}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)" stroke-dasharray="3 3"/><text x="2" y="${ys(v)+4}" font-size="9" fill="var(--muted)">${v}</text>`).join('');
@@ -265,6 +266,7 @@ function vSettings(){shell('الإعدادات',`<div class="card"><label class=
  <label class="f" for="lv">مستواك الحالي</label><select id="lv">${['A1','A2','B1','B2','C1','C2'].map(l=>`<option ${S.level===l?'selected':''}>${l}</option>`).join('')}</select>
  <label class="f" for="th">الشكل</label><select id="th"><option value="auto">حسب الجهاز</option><option value="light">فاتح</option><option value="dark">غامق</option></select>
  <button class="btn full" style="margin-top:12px" onclick="saveSet()">حفظ</button></div>
+ ${reminderCard()}
  <div class="card"><span class="lbl">نسخة احتياطية</span><p class="small muted" style="margin-top:0">كل حاجة محفوظة على الجهاز ده بس. خد نسخة كل أسبوع.</p>
  <div class="row"><button class="btn gold" onclick="exportData()">⬇ تصدير</button><button class="btn ghost" onclick="copy(JSON.stringify(S))">نسخ</button><label class="btn ghost">⬆ استيراد<input type="file" accept="application/json" hidden onchange="importData(this)"></label></div></div>
  <div class="card"><span class="lbl">أدوات مفيدة</span>${RES.tools.map(resRow).join('')}</div>
@@ -282,7 +284,7 @@ let rsArm=0;function resetAll(b){if(!rsArm){rsArm=1;b.textContent='اضغط تا
 function textCard(w,k){const T=TEXTS[w],r=S.texts[w];return `<a class="lnk hi" href="#text-${w}"><div style="font-size:24px">📄</div><div><b>نص الأسبوع ${w}: <span class="en">${esc(T.t)}</span></b><small>${k==='listen'?'اسمعه عادي وبطيء، وبعدين اقراه':'اقراه، اسمعه، وجاوب 5 أسئلة'} · ${r?'آخر نتيجة '+r.s+'/'+r.n:'لسه ما اتحلّش'}</small></div></a>`}
 function allTexts(){return `<details class="card"><summary class="lbl">📚 كل النصوص (12) ▾</summary>${Object.keys(TEXTS).map(n=>{const r=S.texts[n];return `<a class="wl lk" href="#text-${n}"><span class="pill">${n}</span><span class="en" style="flex:1;text-align:start">${esc(TEXTS[n].t)}</span><span class="small muted">${r?r.s+'/'+r.n:'—'}</span></a>`}).join('')}</details>`}
 function textsProgress(){return `<div class="card"><span class="lbl">نصوص الأسبوع: ${Object.keys(S.texts).length} من 12</span><div class="tgrid">${Object.keys(TEXTS).map(n=>{const r=S.texts[n];return `<a href="#text-${n}" class="stat"><b>${r?r.s+'/'+r.n:'—'}</b><span>نص ${n}</span></a>`}).join('')}</div></div>`}
-function vText(n){n=+n;const T=TEXTS[n];if(!T)return vAx('read');const r=S.texts[n];tAns={};
+function vText(n){actStart('read');n=+n;const T=TEXTS[n];if(!T)return vAx('read');const r=S.texts[n];tAns={};
  shell('القراءة والاستماع',`<div class="hero"><small>نص الأسبوع ${n} · مستوى <span class="en">${T.lv}</span></small><h2 class="en ltr">${esc(T.t)}</h2><div class="ln">📘 القاعدة اللي في النص: <span class="en">${esc(T.gr)}</span></div></div>
  <div class="card small" style="margin-top:12px"><span class="lbl">الطريقة</span>١) اسمع من غير ما تبص على النص · ٢) اسمع وانت بتقرا · ٣) جاوب الأسئلة · ٤) اقرا بصوت عالي وسجّل نفسك في محور الكلام</div>
  <div class="row" style="margin-bottom:12px"><button class="btn" style="flex:1" onclick="speakSeq(TEXTS[${n}].p.join(' '),.9)">🔊 اسمع</button><button class="btn ghost" style="flex:1" onclick="speakSeq(TEXTS[${n}].p.join(' '),.7)">🐢 أبطأ</button><button class="btn ghost" onclick="stopSpeak()" aria-label="وقّف الصوت">■</button></div>
@@ -295,13 +297,13 @@ function vText(n){n=+n;const T=TEXTS[n];if(!T)return vAx('read');const r=S.texts
 function pick(i,j){if(tAns.done)return;tAns[i]=j;document.querySelectorAll(`[id^="o${i}_"]`).forEach(b=>b.classList.toggle('on',b.id===`o${i}_${j}`))}
 function checkText(n){const T=TEXTS[n];if(tAns.done)return;if(T.q.some((_,i)=>tAns[i]==null))return toast('جاوب كل الأسئلة الأول');
  let s=0;T.q.forEach((q,i)=>{const ok=tAns[i]===q[2];if(ok)s++;$(`#o${i}_${q[2]}`).classList.add('ok');if(!ok)$(`#o${i}_${tAns[i]}`).classList.add('bad');$('#fb'+i).innerHTML=/^[A-Za-z“"]/.test(q[3])?`<div class="ltr en">${ok?'✓':'✗'} ${esc(q[3])}</div>`:(ok?'✓ ':'✗ ')+tx(q[3])});
- tAns.done=1;const t=today(),first=!S.texts[n]||S.texts[n].d!==t;S.texts[n]={s,n:T.q.length,d:t};if(first)addMinQ('read',15);else save();
- toast(`نتيجتك ${s}/${T.q.length}${first?' · اتحسب 15 دقيقة قراءة':''}`)}
+ tAns.done=1;const t=today(),first=!S.texts[n]||S.texts[n].d!==t;S.texts[n]={s,n:T.q.length,d:t};save();
+ toast(`نتيجتك ${s}/${T.q.length}`)}
 function addGloss(w,m){if(everyWord().some(c=>c.w.toLowerCase()===String(w).toLowerCase()))return toast('موجودة في الدفتر بالفعل');S.custom.push([w,m,'']);save();toast('اتضافت للبطاقات ✓')}
 
 // ---------- حوارات الفرع ----------
 function allDlgs(){return `<details class="card"><summary class="lbl">🎭 كل الحوارات (12) ▾</summary>${Object.keys(DIALOGS).map(n=>`<a class="wl lk" href="#dlg-${n}"><span class="pill">${n}</span><span class="en" style="flex:1;text-align:start">${esc(DIALOGS[n].t)}</span></a>`).join('')}</details>`}
-function vDlg(n){n=+n;const D=DIALOGS[n];if(!D)return vSpeak();const P=!!(dl&&dl.n===n),L=P?D.l.slice(0,dl.i+1):D.l;
+function vDlg(n){actStart('speak');n=+n;const D=DIALOGS[n];if(!D)return vSpeak();const P=!!(dl&&dl.n===n),L=P?D.l.slice(0,dl.i+1):D.l;
  shell('الكلام',`<div class="hero"><small>حوار الأسبوع ${n}${P?' · وضع التمرين':''}</small><h2 class="en ltr">${esc(D.t)}</h2><div class="ln">${esc(D.sit)}</div></div>
  ${P?'<div style="height:12px"></div>':`<div class="card small" style="margin-top:12px"><span class="lbl">الطريقة</span>١) اسمع الحوار كله · ٢) كرر جملك (الصفرا) بصوت عالي · ٣) دوس «اتمرن على دورك»: هتسمع العميل وتشوف ردك بالعربي، وانت تقوله بالإنجليزي قبل ما يظهر.</div>
  <div class="row" style="margin-bottom:12px"><button class="btn" style="flex:1" onclick="dlgPlay(${n})">🔊 اسمع الحوار</button><button class="btn gold" style="flex:1" onclick="dlgStart(${n})">🎭 اتمرن على دورك</button><button class="btn ghost" onclick="stopSpeak()" aria-label="وقّف الصوت">■</button></div>`}
@@ -326,7 +328,7 @@ function dlgPlay(n){const D=DIALOGS[n];try{speechSynthesis.cancel();const V=enVo
  D.l.forEach(l=>{const u=utter(l[1]),c=l[0]==='C';if(c&&b)u.voice=b;else if(a)u.voice=a;if(c&&!b)u.pitch=1.25;speechSynthesis.speak(u)})}catch(e){toast('النطق مش متاح على الجهاز ده')}}
 
 // ---------- بنك العبارات ----------
-function vPhrases(){shell('بنك العبارات',`<p class="muted" style="margin-top:0">عبارات الشغل اليومية في ${PHRASES.length} مواقف. اسمع وكرر، وضيف اللي محتاجه للبطاقات بزرار +.</p>
+function vPhrases(){actStart('speak');shell('بنك العبارات',`<p class="muted" style="margin-top:0">عبارات الشغل اليومية في ${PHRASES.length} مواقف. اسمع وكرر، وضيف اللي محتاجه للبطاقات بزرار +.</p>
  ${PHRASES.map(g=>`<div class="card"><span class="lbl">${esc(g.t)}</span>${g.p.map(p=>`<div class="wd"><div class="row" style="flex-wrap:nowrap"><span class="en ltr" style="flex:1;font-weight:700">${esc(p[0])}</span><button class="say" onclick="speak(${esc(JSON.stringify(p[0]))})" aria-label="اسمع">🔊</button><button class="say" onclick="addGloss(${esc(JSON.stringify(p[0]))},${esc(JSON.stringify(p[1]))})" aria-label="ضيفها للبطاقات">+</button></div><div class="small muted">${esc(p[1])}</div></div>`).join('')}</div>`).join('')}
  <button class="btn ghost full" onclick="go('ax-speak')">→ رجوع للكلام</button>`,'axes')}
 
@@ -334,7 +336,7 @@ function vPhrases(){shell('بنك العبارات',`<p class="muted" style="mar
 function modelIdx(w){let m=-1;MODELS.forEach((x,i)=>{if(x.wk<=w)m=i});return m}
 function modelCard(){const i=modelIdx(curWeek());if(i<0)return '';const M=MODELS[i];return `<a class="lnk hi" href="#model-${i}"><div style="font-size:24px">📝</div><div><b>نموذج الأسبوع: ${esc(M.t)}</b><small>${tx(M.k)}</small></div></a>`}
 function allModels(){return `<details class="card"><summary class="lbl">📝 كل نماذج الكتابة (${MODELS.length}) ▾</summary>${MODELS.map((M,i)=>`<a class="wl lk" href="#model-${i}"><span class="pill">أسبوع ${M.wk}</span><span style="flex:1;text-align:start">${esc(M.t)}</span><span class="small muted">${(S.drafts[i]||'').trim()?'✓':''}</span></a>`).join('')}</details>`}
-function vModel(i){i=+i;const M=MODELS[i];if(!M)return vAx('write');const d=S.drafts[i]||'',wn=v=>(v.trim().match(/\S+/g)||[]).length;
+function vModel(i){actStart('write');i=+i;const M=MODELS[i];if(!M)return vAx('write');const d=S.drafts[i]||'',wn=v=>(v.trim().match(/\S+/g)||[]).length;
  shell('الكتابة',`<div class="hero"><small>نموذج كتابة · الأسبوع ${M.wk}</small><h2>${esc(M.t)}</h2><div class="ln">${tx(M.k)}</div></div>
  <div class="card" style="margin-top:12px"><span class="lbl">إزاي تكتبه</span>${M.tips.map(t=>`<div class="small" style="padding:3px 0">• ${tx(t)}</div>`).join('')}</div>
  <div class="card"><span class="lbl">النموذج</span><pre class="mdl">${esc(M.txt)}</pre><div class="row"><button class="btn sm ghost" onclick="speakSeq(MODELS[${i}].txt,.9)">🔊 اسمع</button><button class="btn sm ghost" onclick="stopSpeak()" aria-label="وقّف الصوت">■</button></div></div>
@@ -378,8 +380,54 @@ let updShown=false;
 async function checkRemote(){if(updShown||!navigator.onLine)return;try{const r=await fetch('version.js',{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/v:'([\d.]+)'/);
  if(m&&vNum(m[1])>vNum(APP_VERSION)){updShown=true;const b=document.createElement('div');b.className='updbar';b.innerHTML=`<span>🔄 فيه تحديث جديد (<span class="en">${m[1]}</span>)</span><button class="btn sm gold" onclick="applyUpdate()">حدّث دلوقتي</button>`;document.body.appendChild(b)}}catch(e){}}
 async function applyUpdate(){try{const r=await navigator.serviceWorker.getRegistration();if(r)await r.update()}catch(e){}location.reload()}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkRemote()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){checkRemote();consumeInbox()}});
 setInterval(checkRemote,30*60*1000);
 
-applyTheme();route();checkUpdated();
+// ---------- الوقت الحقيقي ----------
+// التطبيق بيحسب الوقت اللي انت فعلًا شغال فيه في كل محور: كل 15 ثانية، لو لمست الشاشة في آخر دقيقتين أو الصوت شغال.
+// المؤقت بيتحسب من الساعة لوحده. ولما وقت المحور يوصل للمطلوب، بيتعلّم في الروتين.
+let act=null,tmr=null,lastInput=Date.now();
+['pointerdown','keydown','scroll','touchstart','input'].forEach(ev=>addEventListener(ev,()=>{lastInput=Date.now()},{passive:true,capture:true}));
+function actStart(k){act={k}}
+function actStop(){act=null}
+function actualMin(d,k){return ((S.mins[d]||{})[k]||0)+((S.tsec[d]||{})[k]||0)/60}
+function minutesFor(d,k){const r=ROUTINE.find(x=>x.k===k),a=actualMin(d,k);return (S.days[d]||{})[k]?Math.max(a,r?r.m:0):a}
+function addSec(k,sec){if(!(sec>0))return;const t=today();S.tsec[t]=S.tsec[t]||{};S.tsec[t][k]=(S.tsec[t][k]||0)+sec;
+ const r=ROUTINE.find(x=>x.k===k);if(r&&!(S.days[t]||{})[k]&&actualMin(t,k)>=r.m){S.days[t]=S.days[t]||{};S.days[t][k]=true;toast('✓ '+r.t+': خلصت '+r.m+' دقيقة النهارده')}save()}
+function timerFlush(){if(tmr&&tmr.since){addSec(tmr.k,Math.round((Date.now()-tmr.since)/1000));tmr.since=0}}
+setInterval(()=>{if(!act||document.visibilityState!=='visible')return;let sp=false;try{sp=speechSynthesis.speaking}catch(e){}if(sp||Date.now()-lastInput<120000)addSec(act.k,15)},15000);
+
+// ---------- التذكير اليومي ----------
+// 1) التقويم: ملف .ics بيعمل تذكير يومي في تقويم الموبايل (أضمن طريقة).
+// 2) إشعار التطبيق: على أندرويد بعد التثبيت، المتصفح بيصحّي التطبيق من وقت للتاني (Periodic Background Sync)،
+//    ولو عدّى ميعاد التذكير والروتين أقل من 3 حاجات بيظهر إشعار. المتصفح هو اللي بيحدد إمتى، فممكن يتأخر.
+//    الـ service worker ما بيقدرش يقرا localStorage، فبنكتبله ملخص صغير في الكاش (ej-meta).
+var metaLast=''; // var عشان save() ممكن تتنادى قبل السطر ده وقت الفتح
+function writeMeta(){if(!('caches' in window))return;const t=today(),m={on:!!S.remind.on,t:S.remind.t||'20:00',done:{[t]:dayDone(t)}},j=JSON.stringify(m);if(j===metaLast)return;metaLast=j;
+ caches.open('ej-meta').then(async c=>{const old=await c.match('./__meta');if(old){try{m.shown=(await old.json()).shown}catch(e){}}return c.put('./__meta',new Response(JSON.stringify(m),{headers:{'Content-Type':'application/json'}}))}).catch(()=>{})}
+function reminderCard(){const R=S.remind,ok='Notification' in window;return `<div class="card"><span class="lbl">⏰ التذكير اليومي</span>
+ <label class="f" for="rt" style="margin-top:0">الميعاد</label><input type="time" id="rt" value="${esc(R.t)}" onchange="S.remind.t=this.value||'20:00';save();toast('اتحفظ ✓ لو ضفته للتقويم قبل كده، ضيفه تاني بالميعاد الجديد')">
+ <p class="small muted">أضمن طريقة إن الموبايل يفكّرك كل يوم: ضيف التذكير لتقويم الموبايل.</p>
+ <button class="btn gold full" onclick="downloadICS()">📅 ضيف التذكير للتقويم</button>
+ ${ok?`<div class="row" style="margin-top:8px"><button class="btn ghost" style="flex:1" onclick="enableNotif()">🔔 ${R.on?'إشعار التطبيق شغال':'فعّل إشعار التطبيق'}</button>${R.on?'<button class="btn ghost sm" onclick="testNotif()">جرّب</button><button class="btn ghost sm" onclick="disableNotif()">وقّف</button>':''}</div>
+ <p class="small muted" style="margin-bottom:0">${R.on&&!R.ps?'إشعارات التطبيق اتفعّلت، بس جهازك مش بيسمح للتطبيق يصحى لوحده. اعتمد على التقويم. ':''}إشعار التطبيق بيشتغل على أندرويد بعد ما التطبيق يتثبت، وبيظهر بس لو ما خلصتش 3 حاجات من الروتين. المتصفح هو اللي بيحدد إمتى يصحّي التطبيق، فممكن يتأخر شوية.</p>`:''}</div>`}
+function icsFold(l){const out=[];let cur='',n=0;for(const ch of l){const b=new TextEncoder().encode(ch).length;if(n+b>73){out.push(cur);cur=' ';n=1}cur+=ch;n+=b}out.push(cur);return out.join('\r\n')}
+function downloadICS(){const [h,m]=(S.remind.t||'20:00').split(':'),d=new Date(),url=location.href.split('#')[0]+'#today';
+ const p=x=>String(x).padStart(2,'0'),day=d.getFullYear()+p(d.getMonth()+1)+p(d.getDate()),stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+ const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//English Journey//AR','CALSCALE:GREGORIAN','BEGIN:VEVENT','UID:ej-daily-'+day+'@english-journey','DTSTAMP:'+stamp,
+  'DTSTART:'+day+'T'+p(h)+p(m)+'00','DURATION:PT30M','RRULE:FREQ=DAILY','SUMMARY:رحلة الإنجليزي: روتين النهارده','DESCRIPTION:افتح التطبيق وخلّص روتينك: '+url,'URL:'+url,
+  'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:رحلة الإنجليزي','TRIGGER:PT0M','END:VALARM','END:VEVENT','END:VCALENDAR'];
+ const b=new Blob([L.map(icsFold).join('\r\n')+'\r\n'],{type:'text/calendar;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='english-journey-reminder.ics';document.body.appendChild(a);a.click();
+ setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);toast('افتح الملف واختار التقويم ← حفظ')}
+async function enableNotif(){if(!('Notification' in window))return toast('الإشعارات مش مدعومة هنا');let p=Notification.permission;if(p!=='granted')p=await Notification.requestPermission();
+ if(p!=='granted')return toast('محتاج تسمح بالإشعارات من إعدادات المتصفح');const ps=await trySync();
+ S.remind.on=true;S.remind.ps=ps;save();route();toast(ps?'التذكير اتفعّل ✓':'الإشعارات اتفعّلت، بس جهازك مش بيسمح بالتذكير التلقائي. استخدم التقويم')}
+// بيسجّل الصحيان الدوري لو المتصفح بيسمح (على أندرويد بعد التثبيت)
+async function trySync(){try{const reg=await navigator.serviceWorker.ready;if('periodicSync' in reg){const st=await navigator.permissions.query({name:'periodic-background-sync'});if(st.state==='granted'){await reg.periodicSync.register('ej-remind',{minInterval:60*60*1000});return true}}}catch(e){}return false}
+async function disableNotif(){S.remind.on=false;save();try{const reg=await navigator.serviceWorker.ready;if(reg.periodicSync)await reg.periodicSync.unregister('ej-remind')}catch(e){}route()}
+async function testNotif(){try{const reg=await navigator.serviceWorker.ready;await reg.showNotification('رحلة الإنجليزي ✨',{body:'كده الإشعارات شغالة. هفكّرك بالروتين لو نسيته.',icon:'icons/icon-192.png',badge:'icons/favicon-64.png',tag:'ej-test',lang:'ar',dir:'rtl'})}catch(e){toast('الإشعار ما ظهرش: '+e.message)}}
+
+applyTheme();consumeInbox();route();checkUpdated();writeMeta();
+// لو فعّلت الإشعار قبل ما تثبّت التطبيق، بنحاول نسجّل الصحيان الدوري تاني بعد التثبيت
+if(S.remind.on&&!S.remind.ps)trySync().then(ok=>{if(ok){S.remind.ps=true;save()}});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}})}

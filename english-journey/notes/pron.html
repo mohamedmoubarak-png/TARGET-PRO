@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#8B1A1A">
 <link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/favicon-64.png">
 <title>النطق السليم بأسلوبنا</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -312,10 +313,13 @@ function qShow(){
   if(qs.ready)box.scrollIntoView({behavior:'smooth',block:'start'});
   qs.ready=true;
 }
+// بيبعت نتيجة كل سؤال للتطبيق: اللي بتغلط فيه بيدخل «مراجعة الأخطاء» (نفس الـ hash اللي في practice.js)
+function ejHash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
+function ejLog(d,ok){try{const K='ej_qinbox',a=JSON.parse(localStorage.getItem(K)||'[]');a.push(['p'+ejHash(d.q+'|'+d.o.join('|')),ok?1:0]);localStorage.setItem(K,JSON.stringify(a.slice(-300)))}catch(e){}}
 function qAnswer(i){
   if(qs.picked[qs.pos]!==undefined)return;
   qs.picked[qs.pos]=i;const d=qs.deck[qs.list[qs.pos]];
-  if(i===d.a)qs.score++;
+  if(i===d.a)qs.score++;ejLog(d,i===d.a);
   qReveal(i,[...document.querySelectorAll('#opts .opt')],d);
   const t=document.querySelector('.qz-top span:last-child');if(t)t.textContent='✅ '+qs.score+' صح';
 }
