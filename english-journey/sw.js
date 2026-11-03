@@ -1,8 +1,8 @@
 // يخزن الملفات عشان التطبيق يشتغل من غير نت
 // الصفحات والسكربتات والمحتوى: من النت الأول (عشان أي تعديل يوصل على طول) ولو مفيش نت أو النت بطيء من الكاش
 // الصور والخطوط: من الكاش الأول (مش بتتغير)
-const C='ej-v2';
-const FILES=['./','./index.html','./app.js','./data.js','./manifest.webmanifest','./notes/grammar.html','./notes/pron.html',
+const C='ej-v3';
+const FILES=['./','./index.html','./app.js','./data.js','./packs.js','./lessons.js','./manifest.webmanifest','./notes/grammar.html','./notes/pron.html',
  './icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png','./icons/apple-touch-icon.png','./icons/favicon-64.png'];
 const NET_WAIT=3500;
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
